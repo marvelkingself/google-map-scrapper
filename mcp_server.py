@@ -18,13 +18,20 @@ from scrape import req, geocode, LEAD  # reuse the existing HTTP + geocode helpe
 
 OUT_DIR = os.environ.get("SCRAPER_OUT_DIR", os.path.dirname(os.path.abspath(__file__)))
 POLL_BUDGET = int(os.environ.get("SCRAPER_POLL_SECONDS", "240"))  # stay under client timeouts
+# Google blocks an IP that runs many scrapes at once, and an agent will happily fire ten in a row.
+# One job at a time is the guard; raise it only if you run proxies.
+MAX_PARALLEL = int(os.environ.get("SCRAPER_MAX_PARALLEL", "1"))
+# Proxies are the real defence for bulk scraping, and an agent has no UI to paste them into.
+PROXIES = os.environ.get("SCRAPER_PROXIES", "").replace(",", " ").split()
+CSV_ROW_CAP = 200  # ponytail: caps the reply size for remote callers; paginate if that ever bites
 HTTP_MODE = False  # set by serve_http: the caller has no access to our filesystem
 
 TOOLS = [
     {
         "name": "scrape_businesses",
         "description": ("Scrape Google Maps business listings (name, phone, email, website, address, "
-                        "rating) for one or more search queries. Returns a summary plus a CSV file path. "
+                        "rating) for one or more search queries. Runs ONE job at a time - put several searches in the "
+                        "queries array instead of calling this repeatedly, or Google rate-limits the IP. "
                         "Google Maps only — not social media."),
         "inputSchema": {
             "type": "object",
@@ -60,31 +67,58 @@ def _save(job_id):
 
 
 def _summary(job_id, rows, path):
+    if not rows:
+        return (f"Job {job_id} finished with 0 results. That usually means Google is rate-limiting "
+                f"this IP - wait a few hours, or add proxies (see examples/proxies.example.txt).")
+    if HTTP_MODE:
+        # Remote caller (Paperclip etc.) cannot read our disk, so hand back the data itself.
+        buf = io.StringIO()
+        w = csv.DictWriter(buf, fieldnames=LEAD)
+        w.writeheader()
+        w.writerows(rows[:CSV_ROW_CAP])
+        more = f" (first {CSV_ROW_CAP} shown)" if len(rows) > CSV_ROW_CAP else ""
+        return f"Done: {len(rows)} businesses (job {job_id}).{more}\n\n{buf.getvalue()}"
     head = "\n".join(f"- {r['title']} | {r['phone'] or '-'} | {r['emails'] or '-'} | {r['website'] or '-'}"
                      for r in rows[:10])
-    return (f"Done — {len(rows)} businesses (job {job_id}).\nSaved to {path}\n\nFirst results:\n{head}"
-            if rows else f"Job {job_id} finished with 0 results — likely rate-limited by Google; retry later or use proxies.")
+    return (f"Done: {len(rows)} businesses (job {job_id}).\nSaved to {path}"
+            f"\n\nFirst results:\n{head}")
 
+
+def _busy():
+    """Jobs the scraper is already chewing on."""
+    jobs = json.loads(req("GET", "/api/v1/jobs")[1]) or []
+    return [j for j in jobs if j.get("Status") in ("working", "pending")]
 
 def scrape_businesses(queries, city=None, depth=5, emails=True):
     if not queries:
         return "No queries given."
+    busy = _busy()
+    if len(busy) >= MAX_PARALLEL:
+        return (f"Not starting this one - {len(busy)} scrape(s) already running (e.g. {busy[0]['ID']}). "
+                f"Running several at once gets the IP blocked by Google, so this tool does one at a time. "
+                f"Call check_job on that id; when it says ok, ask again.")
     coords = geocode(city or queries[0])
     if not coords:
         return f"Could not locate '{city or queries[0]}'. Try a clearer city name."
     lat, lon = coords
+    warning = ""
+    if depth > 10 or len(queries) > 20:
+        warning = ("Note: big run (high depth or many searches). It will take a while and can get "
+                   "this IP rate-limited by Google; proxies help. Starting it anyway.\n\n")
     body = {"name": "mcp", "keywords": queries, "lang": "en", "zoom": 15, "lat": lat, "lon": lon,
             "fast_mode": False, "radius": 10000, "depth": depth, "email": emails, "max_time": 600}
+    if PROXIES:
+        body["proxies"] = PROXIES
     job_id = json.loads(req("POST", "/api/v1/jobs", body)[1])["id"]
     deadline = time.time() + POLL_BUDGET
     while time.time() < deadline:
         time.sleep(8)
         status = json.loads(req("GET", f"/api/v1/jobs/{job_id}")[1]).get("Status")
         if status == "ok":
-            return _summary(job_id, *_save(job_id))
+            return warning + _summary(job_id, *_save(job_id))
         if status == "failed":
             return f"Job {job_id} failed — possibly rate-limited. Wait a while or use proxies."
-    return (f"Job {job_id} is still running (big jobs take a while). "
+    return (warning + f"Job {job_id} is still running (big jobs take a while). "
             f"Call check_job with job_id={job_id} in a few minutes.")
 
 
@@ -137,6 +171,17 @@ def selfcheck():
     empty = handle({"jsonrpc": "2.0", "id": 4, "method": "tools/call",
                     "params": {"name": "scrape_businesses", "arguments": {"queries": []}}})
     assert empty["result"]["content"][0]["text"] == "No queries given."
+
+    # concurrency guard must fire without touching the network
+    import mcp_server as M
+    real_req, real_geo = M.req, M.geocode
+    M.req = lambda m, pth, b=None: (200, b'[{"ID":"busy-1","Status":"working"}]')
+    M.geocode = lambda place: ("1.0", "2.0")
+    try:
+        msg = M.scrape_businesses(["cafes in Pune"])
+        assert "already running" in msg and "busy-1" in msg, msg
+    finally:
+        M.req, M.geocode = real_req, real_geo
     print("selfcheck ok")
 
 
