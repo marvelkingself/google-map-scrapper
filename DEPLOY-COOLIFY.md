@@ -1,15 +1,16 @@
 # Deploy to Coolify
 
-Uses `docker-compose.coolify.yml`. The scraper image has **no authentication**, so it never gets a
+Uses `docker-compose.yml` (the default Coolify picks up). The scraper image has **no authentication**, so it never gets a
 domain — a Caddy container with a password does, and proxies inward. Do not give the
 `google-maps-scraper` service a domain in Coolify.
 
 ## Steps
 1. **Coolify -> + New -> Public Repository**, point it at this repo.
-2. Set **Build Pack** to `Docker Compose` and **Docker Compose Location** to
-   `/docker-compose.coolify.yml`, then Save and reload the compose file. Three services must appear:
-   `google-maps-scraper`, `mcp`, `auth`. If only one appears, the location is still the default and the
-   deploy will fail on a port clash - the local compose publishes 8080, this one does not.
+2. Set **Build Pack** to `Docker Compose`. Leave **Docker Compose Location** at the default
+   `/docker-compose.yml` - that file IS the server stack. (The laptop-only version lives in
+   `docker-compose.local.yml`, which Coolify must never deploy: it publishes port 8080 on the host and
+   will collide with whatever already holds it.) Three services must appear: `google-maps-scraper`,
+   `mcp`, `auth`.
 3. **Environment Variables**:
    | Name | Value |
    |---|---|

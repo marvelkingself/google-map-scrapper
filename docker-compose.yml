@@ -1,25 +1,63 @@
-# Runs the open-source Google Maps scraper (gosom/google-maps-scraper) locally.
-# Web/API mode on http://localhost:8080. The image has NO built-in auth, so we bind
-# to 127.0.0.1 ONLY — that localhost binding is the security boundary. Do not change
-# the port mapping to 0.0.0.0 / a public interface without putting an auth proxy in front.
+# Coolify deployment. Differs from docker-compose.yml in one way that matters:
+# locally the 127.0.0.1 port binding IS the security boundary. On a public server it's gone,
+# so the scraper publishes NO ports and only Caddy (which demands a password) gets the domain.
+# Never give a domain to the google-maps-scraper service itself — the image has no auth.
 
 services:
   google-maps-scraper:
-    # Pinned to a known-good release for reproducibility (bump deliberately).
-    # The published image is linux/amd64. On Apple Silicon (M1/M2/M3) it runs under
     image: gosom/google-maps-scraper:latest
-    # platform: linux/amd64
-    container_name: gmaps-scraper
-    restart: unless-stopped
     command: ["-web", "-data-folder", "/gmapsdata"]
-    ports:
-      # Host port is overridable: SCRAPER_PORT=8090 docker compose up -d (8080 is a popular port
-      # and something else may already hold it). The 127.0.0.1 prefix is not optional.
-      - "127.0.0.1:${SCRAPER_PORT:-8080}:8080"   # localhost only — see warning above
+    restart: unless-stopped
+    expose:
+      - "8080"                 # internal network only — no domain, no published port
+    shm_size: "1gb"            # Chromium crashes on the default 64MB /dev/shm
     volumes:
-      - gmaps_data:/gmapsdata    # job results persist here
-      - gmaps_cache:/opt         # Playwright browser cache (faster restarts)
+      - gmaps_data:/gmapsdata
+      - gmaps_cache:/opt
+
+  # MCP endpoint so agent platforms (Paperclip etc.) can use the scraper as a tool.
+  mcp:
+    image: python:3.12-alpine
+    working_dir: /app
+    command: ["python", "mcp_server.py", "--http"]
+    restart: unless-stopped
+    environment:
+      - SCRAPER_BASE_URL=http://google-maps-scraper:8080   # internal, no password needed
+      - MCP_TOKEN=${MCP_TOKEN:?set MCP_TOKEN in Coolify (any long random string)}
+      - SCRAPER_OUT_DIR=/tmp                               # remote callers get the rows inline, not a file
+      # Bulk scraping without proxies gets a VPS IP blocked fast. Set this in Coolify when you have them
+      # (space- or comma-separated): http://user:pass@ip:port socks5://ip:port
+      - SCRAPER_PROXIES=${SCRAPER_PROXIES:-}
+      - SCRAPER_MAX_PARALLEL=${SCRAPER_MAX_PARALLEL:-1}    # raise above 1 only with proxies
+    volumes:
+      - ./:/app:ro
+    expose:
+      - "8081"
+    depends_on:
+      - google-maps-scraper
+
+  auth:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    # Caddy hashes the password itself at startup. A bcrypt hash is full of "$" signs and docker
+    # compose eats those when they come from an env file, so only the plain password travels in env.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - 'export AUTH_HASH="$$(caddy hash-password --plaintext "$$AUTH_PASS")"; exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile'
+    environment:
+      - SERVICE_FQDN_AUTH_8080
+      - AUTH_USER=${AUTH_USER:-marketing}
+      - AUTH_PASS=${AUTH_PASS:?set AUTH_PASS in Coolify (plain password, avoid the $ character)}
+    expose:
+      - "8080"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on:
+      - google-maps-scraper
+      - mcp
 
 volumes:
   gmaps_data:
   gmaps_cache:
+  caddy_data:

@@ -5,7 +5,7 @@
 2. Download this folder (Code → Download ZIP) and unzip it.
 3. Open the folder, right-click → "Open in Terminal", and run:
    ```
-   docker compose up -d
+   docker compose -f docker-compose.local.yml up -d
    ```
    First run downloads ~1 GB. After that it starts in seconds and restarts with your PC.
 

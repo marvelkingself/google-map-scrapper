@@ -4,7 +4,7 @@ description: Set up and start the local Google Maps scraper (Docker)
 Set up the Google Maps scraper on this computer:
 
 1. Confirm Docker is installed and running: `docker ps`. If it errors, tell the user to install/start **Docker Desktop** (link in `SETUP.md` §0) and stop here.
-2. From the kit root, start the scraper: `docker compose up -d`.
+2. From the kit root, start the scraper: `docker compose -f docker-compose.local.yml up -d`.
 3. Wait ~10s, then verify it's live: `curl http://localhost:8080/api/v1/jobs` should return a JSON array (often `[]`).
 4. Report success and tell the user they can now run `/scrape <business> in <city>` — or just ask in natural language (e.g. "scrape gyms in Miami").
 5. **Show this over-use warning** (always print it once setup succeeds):

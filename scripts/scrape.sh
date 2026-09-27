@@ -17,7 +17,7 @@ fi
 
 # Is the scraper up?
 if ! curl -s -m 5 "${AUTH[@]}" "$BASE/api/v1/jobs" >/dev/null 2>&1; then
-  echo "✗ Scraper not reachable at $BASE — run 'docker compose up -d' first." >&2
+  echo "✗ Scraper not reachable at $BASE — run 'docker compose -f docker-compose.local.yml up -d' first." >&2
   exit 1
 fi
 

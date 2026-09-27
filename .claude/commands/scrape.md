@@ -6,7 +6,7 @@ The user wants to scrape Google Maps business listings. Query: **$ARGUMENTS**
 
 Use the `google-maps-scraper` skill. Execute:
 
-1. **Health-check** the API: `curl -s http://localhost:8080/api/v1/jobs`. If it's down, run `docker compose up -d` from the kit root, wait ~10s, and retry.
+1. **Health-check** the API: `curl -s http://localhost:8080/api/v1/jobs`. If it's down, run `docker compose -f docker-compose.local.yml up -d` from the kit root, wait ~10s, and retry.
 2. **Parse** the business type and city from the query. Look up the city's **latitude/longitude** (as strings).
 3. **ASK about social profiles — always, before scraping.** Ask the user ONE short question:
    *"Want me to also grab their social profiles (Instagram / Facebook / LinkedIn)? Emails are already included by default. (yes / no)"*

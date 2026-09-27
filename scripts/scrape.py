@@ -189,7 +189,7 @@ def main():
     try:
         req("GET", "/api/v1/jobs")
     except Exception as e:
-        sys.exit(f"✗ Scraper not reachable at {BASE} — run 'docker compose up -d' first.\n  ({e})")
+        sys.exit(f"✗ Scraper not reachable at {BASE} — run 'docker compose -f docker-compose.local.yml up -d' first.\n  ({e})")
 
     proxies = []
     if a.proxies:

@@ -7,7 +7,7 @@ The user wants a **batch** Google Maps scrape. Input: **$ARGUMENTS** (a keywords
 Use the `google-maps-scraper` skill. The API scrapes **many keywords in ONE job** (the `keywords` array),
 so batch = one job with all terms.
 
-1. Ensure the scraper is up (`curl -s http://localhost:8080/api/v1/jobs`; `docker compose up -d` if not).
+1. Ensure the scraper is up (`curl -s http://localhost:8080/api/v1/jobs`; `docker compose -f docker-compose.local.yml up -d` if not).
 2. Read the keyword list (one per line; ignore blank / `#` lines). If a `--city` was given, geocode it once
    for `lat`/`lon`; otherwise expect the location baked into each keyword (geocode the first one).
 3. **ASK about social profiles first** (skip only if the user already said yes/no): *"Also grab social profiles

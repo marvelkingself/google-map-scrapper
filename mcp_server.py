@@ -149,7 +149,7 @@ def handle(msg):
             text = fn(**p.get("arguments", {}))
         except Exception as e:  # surface as tool error, not transport error
             # HTTPError means the scraper answered (bad args / unknown job); anything else = unreachable.
-            hint = "" if isinstance(e, urllib.error.HTTPError) else " Is the scraper running? (docker compose up -d)"
+            hint = "" if isinstance(e, urllib.error.HTTPError) else " Is the scraper running? (docker compose -f docker-compose.local.yml up -d)"
             return {"jsonrpc": "2.0", "id": mid,
                     "result": {"content": [{"type": "text", "text": f"Error: {e}.{hint}"}], "isError": True}}
         result = {"content": [{"type": "text", "text": text}]}

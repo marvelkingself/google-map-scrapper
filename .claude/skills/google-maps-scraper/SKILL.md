@@ -16,7 +16,7 @@ One job can run many keywords. Each result has up to **34 fields**.
 ```bash
 curl -s http://localhost:8080/api/v1/jobs >/dev/null 2>&1 && echo UP || echo DOWN
 ```
-If `DOWN`: `docker compose up -d` (from the kit root), wait ~10s, retry. If Docker isn't installed, point
+If `DOWN`: `docker compose -f docker-compose.local.yml up -d` (from the kit root), wait ~10s, retry. If Docker isn't installed, point
 the user to `SETUP.md`.
 
 ## Step 1 — Create a job  (`POST /api/v1/jobs`)
@@ -165,4 +165,4 @@ large jobs, many keywords, repeated/scheduled runs, or after you see block signa
 - `422 missing max time` → add `max_time` (seconds). `422 missing geo coordinates` → add string `lat`/`lon`.
 - Stuck `working` → lower `depth` / raise `max_time` / IP throttled (add proxies or wait).
 - Empty CSV → keyword too narrow or geo wrong → widen `radius`, fix coordinates.
-- Connection refused → container down → `docker compose up -d`.
+- Connection refused → container down → `docker compose -f docker-compose.local.yml up -d`.
