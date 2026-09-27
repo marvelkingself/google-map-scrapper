@@ -40,7 +40,11 @@ TOOLS = [
                             "description": 'Searches as typed into Google Maps, e.g. ["dentists in Rotterdam"]'},
                 "city": {"type": "string", "description": "City/place to centre the search on. Defaults to the first query."},
                 "depth": {"type": "integer", "default": 5, "description": "Scroll depth; ~20 results per level. 1-5 is sane."},
-                "emails": {"type": "boolean", "default": True, "description": "Also visit each website to find an email (slower)."},
+                "emails": {"type": "boolean", "default": False,
+                           "description": ("Visit every business website hunting for an email address. OFF by "
+                                           "default: what it finds includes named personal addresses "
+                                           "(firstname.lastname@), which are personal data under GDPR. Turn it "
+                                           "on only when someone has decided that is lawful for this use.")},
             },
             "required": ["queries"],
         },
@@ -89,7 +93,7 @@ def _busy():
     jobs = json.loads(req("GET", "/api/v1/jobs")[1]) or []
     return [j for j in jobs if j.get("Status") in ("working", "pending")]
 
-def scrape_businesses(queries, city=None, depth=5, emails=True):
+def scrape_businesses(queries, city=None, depth=5, emails=False):
     if not queries:
         return "No queries given."
     busy = _busy()
