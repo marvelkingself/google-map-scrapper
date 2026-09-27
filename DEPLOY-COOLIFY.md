@@ -1,0 +1,59 @@
+# Deploy to Coolify
+
+Uses `docker-compose.coolify.yml`. The scraper image has **no authentication**, so it never gets a
+domain — a Caddy container with a password does, and proxies inward. Do not give the
+`google-maps-scraper` service a domain in Coolify.
+
+## Steps
+1. **Generate a password hash** (locally, or on the Coolify host):
+   ```
+   docker run --rm caddy:2-alpine caddy hash-password --plaintext 'a-long-password'
+   ```
+2. **Coolify → Project → + New → Docker Compose**, point it at this git repo,
+   set **Compose file** to `docker-compose.coolify.yml`.
+3. **Environment variables** (Coolify → Environment Variables):
+   | Name | Value |
+   |---|---|
+   | `AUTH_USER` | `marketing` |
+   | `AUTH_HASH` | the `$2a$14$…` hash from step 1 — paste it raw |
+   Paste the hash in Coolify's env UI, not into a `.env` file: in a `.env`/compose file every `$`
+   must be doubled to `$$`, in Coolify's UI it must not be.
+4. **Domain**: assign one to the **`auth`** service only (port 8080). Coolify wires up TLS.
+5. Deploy. Open the domain → browser asks for the username/password → the scraper UI appears.
+   Hand those credentials + `HANDOFF.md` to whoever does the research.
+
+## Server requirements
+- **2 GB RAM minimum**, 4 GB if you run depth > 5 or email extraction. It drives a real Chromium.
+- `shm_size: 1gb` is already set — without it Chromium crashes mid-job on Docker's default 64 MB.
+- Volumes `gmaps_data` (results) and `gmaps_cache` (browser, ~400 MB) persist across deploys.
+
+## Expect proxies to be necessary
+A VPS exit IP is a datacenter IP. Google rate-limits those far faster than a home/office
+connection — a server that worked on your laptop can start returning empty jobs within a few jobs.
+Symptom: jobs finish `ok` with 0 results, or fail. Fix: paste residential proxies into the
+**Proxies** box in the UI (one per line), see `examples/proxies.example.txt`.
+
+## Using it from Paperclip (or any agent platform)
+The `mcp` service serves MCP over HTTP at **`https://<your-domain>/mcp`**, protected by a Bearer
+token (`MCP_TOKEN` — any long random string, set it in Coolify).
+
+In Paperclip: **Connectors -> Connect your own MCP server** -> paste `https://<your-domain>/mcp`.
+When it asks for credentials, give the `MCP_TOKEN` value as the API key (Paperclip sends it as an
+`Authorization` header, which is what the server checks). Then grant the connector to the agent that
+does lead research and set its tools to **Allowed** or **Ask first**.
+
+The agent gets two tools: `scrape_businesses` and `check_job`. Over HTTP the rows come back as CSV
+text in the reply (up to 200) instead of a file path — the agent has no access to the server's disk.
+
+## Using the MCP server locally against the deployed instance
+`mcp_server.py` still runs **locally** (MCP stdio isn't remote); just point it at the server:
+```
+claude mcp add gmaps   -e SCRAPER_BASE_URL=https://scraper.example.com   -e SCRAPER_BASIC_AUTH=marketing:a-long-password   -- python /path/to/mcp_server.py
+```
+`SCRAPER_BASIC_AUTH` is `user:password`, not the hash. Credentials in the URL itself
+(`https://user:pass@…`) do **not** work — Python's urllib silently ignores them.
+
+## Not covered
+No backups of `gmaps_data` — results are re-scrapable, and the CSVs you keep are the deliverable.
+Scraped emails/phones are personal data: a public URL holding them needs a real password, which is
+the whole point of the `auth` service. Don't remove it to "make it easier".

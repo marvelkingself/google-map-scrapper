@@ -1,0 +1,55 @@
+# Coolify deployment. Differs from docker-compose.yml in one way that matters:
+# locally the 127.0.0.1 port binding IS the security boundary. On a public server it's gone,
+# so the scraper publishes NO ports and only Caddy (which demands a password) gets the domain.
+# Never give a domain to the google-maps-scraper service itself — the image has no auth.
+
+services:
+  google-maps-scraper:
+    image: gosom/google-maps-scraper:latest
+    command: ["-web", "-data-folder", "/gmapsdata"]
+    restart: unless-stopped
+    expose:
+      - "8080"                 # internal network only — no domain, no published port
+    shm_size: "1gb"            # Chromium crashes on the default 64MB /dev/shm
+    volumes:
+      - gmaps_data:/gmapsdata
+      - gmaps_cache:/opt
+
+  # MCP endpoint so agent platforms (Paperclip etc.) can use the scraper as a tool.
+  mcp:
+    image: python:3.12-alpine
+    working_dir: /app
+    command: ["python", "mcp_server.py", "--http"]
+    restart: unless-stopped
+    environment:
+      - SCRAPER_BASE_URL=http://google-maps-scraper:8080   # internal, no password needed
+      - MCP_TOKEN=${MCP_TOKEN:?set MCP_TOKEN in Coolify (any long random string)}
+      - SCRAPER_OUT_DIR=/tmp                               # remote callers get the rows inline, not a file
+    volumes:
+      - ./:/app:ro
+    expose:
+      - "8081"
+    depends_on:
+      - google-maps-scraper
+
+  auth:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      # Coolify replaces this with the generated/assigned domain and wires up its proxy.
+      - SERVICE_FQDN_AUTH_8080
+      - AUTH_USER=${AUTH_USER:?set AUTH_USER in Coolify}
+      - AUTH_HASH=${AUTH_HASH:?set AUTH_HASH in Coolify (caddy hash-password)}
+    expose:
+      - "8080"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on:
+      - google-maps-scraper
+      - mcp
+
+volumes:
+  gmaps_data:
+  gmaps_cache:
+  caddy_data:

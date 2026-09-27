@@ -1,0 +1,15 @@
+# Two doors, one domain:
+#   /mcp   -> the MCP server (its own Bearer token, for Paperclip and other agent platforms)
+#   /      -> the scraper web UI, behind a username/password (the image has no auth of its own)
+# Generate AUTH_HASH with: docker run --rm caddy:2-alpine caddy hash-password --plaintext 'your-password'
+:8080 {
+	handle /mcp* {
+		reverse_proxy mcp:8081
+	}
+	handle {
+		basic_auth {
+			{$AUTH_USER} {$AUTH_HASH}
+		}
+		reverse_proxy google-maps-scraper:8080
+	}
+}
