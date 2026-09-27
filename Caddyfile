@@ -3,7 +3,9 @@
 #   /      -> the scraper web UI, behind a username/password (the image has no auth of its own)
 # AUTH_HASH is produced at container start from AUTH_PASS (see docker-compose.yml),
 # so no bcrypt hash ever travels through an env file.
-:8080 {
+# Listens on both ports: Traefik falls back to the lowest exposed port (80) when no
+# loadbalancer.server.port label says otherwise, and the caddy image already exposes 80/443/2019.
+:80, :8080 {
 	handle /mcp* {
 		reverse_proxy mcp:8081
 	}

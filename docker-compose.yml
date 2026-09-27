@@ -50,6 +50,7 @@ services:
       - AUTH_USER=${AUTH_USER:-marketing}
       - AUTH_PASS=${AUTH_PASS:?set AUTH_PASS in Coolify (plain password, avoid the $ character)}
     expose:
+      - "80"
       - "8080"
     volumes:
       - caddy_data:/data
