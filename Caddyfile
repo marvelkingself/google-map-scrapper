@@ -1,7 +1,7 @@
 # Two doors, one domain:
 #   /mcp   -> the MCP server (its own Bearer token, for Paperclip and other agent platforms)
 #   /      -> the scraper web UI, behind a username/password (the image has no auth of its own)
-# AUTH_HASH is produced at container start from AUTH_PASS (see docker-compose.coolify.yml),
+# AUTH_HASH is produced at container start from AUTH_PASS (see docker-compose.yml),
 # so no bcrypt hash ever travels through an env file.
 :8080 {
 	handle /mcp* {
