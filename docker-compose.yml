@@ -17,9 +17,7 @@ services:
 
   # MCP endpoint so agent platforms (Paperclip etc.) can use the scraper as a tool.
   mcp:
-    image: python:3.12-alpine
-    working_dir: /app
-    command: ["python", "mcp_server.py", "--http"]
+    build: .                 # files are copied into the image; a repo bind mount does not exist on the host
     restart: unless-stopped
     environment:
       - SCRAPER_BASE_URL=http://google-maps-scraper:8080   # internal, no password needed
@@ -29,15 +27,15 @@ services:
       # (space- or comma-separated): http://user:pass@ip:port socks5://ip:port
       - SCRAPER_PROXIES=${SCRAPER_PROXIES:-}
       - SCRAPER_MAX_PARALLEL=${SCRAPER_MAX_PARALLEL:-1}    # raise above 1 only with proxies
-    volumes:
-      - ./:/app:ro
     expose:
       - "8081"
     depends_on:
       - google-maps-scraper
 
   auth:
-    image: caddy:2-alpine
+    build:
+      context: .
+      dockerfile: Dockerfile.caddy   # Caddyfile is baked in, not mounted
     restart: unless-stopped
     # Caddy hashes the password itself at startup. A bcrypt hash is full of "$" signs and docker
     # compose eats those when they come from an env file, so only the plain password travels in env.
@@ -51,7 +49,6 @@ services:
     expose:
       - "8080"
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
     depends_on:
       - google-maps-scraper

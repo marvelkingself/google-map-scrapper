@@ -72,6 +72,13 @@ claude mcp add gmaps   -e SCRAPER_BASE_URL=https://scraper.example.com   -e SCRA
 `SCRAPER_BASIC_AUTH` is `user:password`, not the hash. Credentials in the URL itself
 (`https://user:pass@…`) do **not** work — Python's urllib silently ignores them.
 
+## Why there are Dockerfiles
+Coolify clones the repo inside a build helper, not onto the deployment host, so a compose bind mount
+like `./Caddyfile:/etc/caddy/Caddyfile` points at a path that does not exist - Docker then creates an
+empty *directory* there and the container dies with "not a directory". `Dockerfile` (the MCP server)
+and `Dockerfile.caddy` (the Caddy config) copy those files into the images instead. Do not turn them
+back into bind mounts.
+
 ## Not covered
 No backups of `gmaps_data` — results are re-scrapable, and the CSVs you keep are the deliverable.
 Scraped emails/phones are personal data: a public URL holding them needs a real password, which is
