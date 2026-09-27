@@ -42,8 +42,21 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command:
       - 'export AUTH_HASH="$$(caddy hash-password --plaintext "$$AUTH_PASS")"; exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile'
+    # Coolify generates no traefik labels for compose services, so they are spelled out here.
+    # AUTH_DOMAIN is the bare hostname (no https://), e.g. scraper.example.com - its DNS A record
+    # must point at this server. The https router only works once the cert is issued; http keeps
+    # working meanwhile, which is why there is no forced redirect.
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.gmaps-http.entryPoints=http
+      - traefik.http.routers.gmaps-http.rule=Host(`${AUTH_DOMAIN}`)
+      - traefik.http.routers.gmaps-https.entryPoints=https
+      - traefik.http.routers.gmaps-https.rule=Host(`${AUTH_DOMAIN}`)
+      - traefik.http.routers.gmaps-https.tls=true
+      - traefik.http.routers.gmaps-https.tls.certresolver=letsencrypt
+      - traefik.http.services.gmaps.loadbalancer.server.port=8080
     environment:
-      - SERVICE_FQDN_AUTH_8080
+      - AUTH_DOMAIN=${AUTH_DOMAIN:?set AUTH_DOMAIN in Coolify (bare hostname, no https://)}
       - AUTH_USER=${AUTH_USER:-marketing}
       - AUTH_PASS=${AUTH_PASS:?set AUTH_PASS in Coolify (plain password, avoid the $ character)}
     expose:
