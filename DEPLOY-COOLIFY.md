@@ -5,21 +5,24 @@ domain — a Caddy container with a password does, and proxies inward. Do not gi
 `google-maps-scraper` service a domain in Coolify.
 
 ## Steps
-1. **Generate a password hash** (locally, or on the Coolify host):
-   ```
-   docker run --rm caddy:2-alpine caddy hash-password --plaintext 'a-long-password'
-   ```
-2. **Coolify → Project → + New → Docker Compose**, point it at this git repo,
-   set **Compose file** to `docker-compose.coolify.yml`.
-3. **Environment variables** (Coolify → Environment Variables):
+1. **Coolify -> + New -> Public Repository**, point it at this repo.
+2. Set **Build Pack** to `Docker Compose` and **Docker Compose Location** to
+   `/docker-compose.coolify.yml`, then Save and reload the compose file. Three services must appear:
+   `google-maps-scraper`, `mcp`, `auth`. If only one appears, the location is still the default and the
+   deploy will fail on a port clash - the local compose publishes 8080, this one does not.
+3. **Environment Variables**:
    | Name | Value |
    |---|---|
    | `AUTH_USER` | `marketing` |
-   | `AUTH_HASH` | the `$2a$14$…` hash from step 1 — paste it raw |
-   Paste the hash in Coolify's env UI, not into a `.env` file: in a `.env`/compose file every `$`
-   must be doubled to `$$`, in Coolify's UI it must not be.
-4. **Domain**: assign one to the **`auth`** service only (port 8080). Coolify wires up TLS.
-5. Deploy. Open the domain → browser asks for the username/password → the scraper UI appears.
+   | `AUTH_PASS` | the password for the web UI - **avoid the `$` character** |
+   | `MCP_TOKEN` | any long random string, for agent platforms - same, no `$` |
+
+   Do not put a bcrypt hash in here. Docker compose treats `$` in an env-file value as a variable
+   reference and silently blanks it; Caddy hashes `AUTH_PASS` itself at container start.
+4. **Domain**: assign one to the **`auth`** service only. Leave `google-maps-scraper` and `mcp` blank -
+   the scraper image has no auth of its own, and `mcp` is reached through `auth` at `/mcp`.
+5. Deploy. The `mcp` logs should print `MCP over HTTP on 0.0.0.0:8081`.
+   Open the domain -> browser asks for the username/password -> the scraper UI appears.
    Hand those credentials + `HANDOFF.md` to whoever does the research.
 
 ## Server requirements
