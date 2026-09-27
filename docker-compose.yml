@@ -13,7 +13,9 @@ services:
     restart: unless-stopped
     command: ["-web", "-data-folder", "/gmapsdata"]
     ports:
-      - "127.0.0.1:8080:8080"   # localhost only — see warning above
+      # Host port is overridable: SCRAPER_PORT=8090 docker compose up -d (8080 is a popular port
+      # and something else may already hold it). The 127.0.0.1 prefix is not optional.
+      - "127.0.0.1:${SCRAPER_PORT:-8080}:8080"   # localhost only — see warning above
     volumes:
       - gmaps_data:/gmapsdata    # job results persist here
       - gmaps_cache:/opt         # Playwright browser cache (faster restarts)
