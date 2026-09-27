@@ -17,15 +17,15 @@ domain — a Caddy container with a password does, and proxies inward. Do not gi
    | `AUTH_USER` | `marketing` |
    | `AUTH_PASS` | the password for the web UI - **avoid the `$` character** |
    | `MCP_TOKEN` | any long random string, for agent platforms - same, no `$` |
-   | `AUTH_DOMAIN` | the bare hostname, e.g. `scraper.example.com` - no `https://`, no trailing slash |
 
    Do not put a bcrypt hash in here. Docker compose treats `$` in an env-file value as a variable
    reference and silently blanks it; Caddy hashes `AUTH_PASS` itself at container start.
-4. **Domain**: point the hostname's DNS A record at the server and set it as `AUTH_DOMAIN`. Coolify
-   generates no traefik labels for compose services, so the routing labels live on the `auth` service in
-   the compose file - only `auth` is routable, and `google-maps-scraper` and `mcp` stay unreachable from
-   outside. The scraper image has no auth of its own; `mcp` is reached through `auth` at `/mcp`.
-   HTTPS appears once Let's Encrypt issues the cert; http works immediately.
+4. **Domain**: in the services list, set a domain on the **`auth`** service only, and make sure
+   `google-maps-scraper` and `mcp` are **blank**. Coolify pre-fills generated domains for every
+   service - a domain left on `google-maps-scraper` publishes the scraper UI and its job API with no
+   password at all, which is how scraped contact data leaks. Coolify writes the traefik labels from
+   this field; hand-written labels in the compose file cannot use a variable, because Coolify escapes
+   `${VAR}` to `$${VAR}` inside labels.
 5. Deploy. The `mcp` logs should print `MCP over HTTP on 0.0.0.0:8081`.
    Open the domain -> browser asks for the username/password -> the scraper UI appears.
    Hand those credentials + `HANDOFF.md` to whoever does the research.
